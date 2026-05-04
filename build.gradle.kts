@@ -5,7 +5,7 @@ plugins {
 }
 
 group = "be.ajuvercr"
-version = "1.2-SNAPSHOT"
+version = "1.3"
 
 repositories {
     mavenCentral()
@@ -28,7 +28,7 @@ intellijPlatform {
     pluginConfiguration {
         ideaVersion {
             sinceBuild = "233"
-            untilBuild = "251.*"
+            untilBuild = provider { null }
         }
 
         changeNotes = """
