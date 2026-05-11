@@ -3,12 +3,12 @@
     <!-- Unique identifier of the plugin. It should be FQN. It cannot be changed between the plugin versions. -->
     <id>be.ajuvercr.swls</id>
     <idea-version since-build="233" />
-    <name>SWLS - Turtle, SPARQL &amp; JSON-LD Language Server</name>
+    <name>SWLS - Turtle, TriG, SPARQL &amp; JSON-LD Language Server</name>
 
     <vendor url="https://github.com/SemanticWebLanguageServer">SemanticWebLanguageServer</vendor>
 
     <description><![CDATA[
-        <p>Semantic Web Language Server for <strong>Turtle</strong>, <strong>SPARQL</strong> and <strong>JSON-LD</strong> —
+        <p>Semantic Web Language Server for <strong>Turtle</strong>, <strong>TriG</strong>, <strong>SPARQL</strong> and <strong>JSON-LD</strong> —
         autocompletion, diagnostics, formatting and more.</p>
 
         <h3>Features</h3>
@@ -26,12 +26,15 @@
         <h3>Supported Languages</h3>
         <ul>
             <li><strong>Turtle</strong> (.ttl)</li>
+            <li><strong>TriG</strong> (.trig)</li>
             <li><strong>JSON-LD</strong> (.jsonld)</li>
             <li><strong>SPARQL</strong> (.sq, .rq)</li>
         </ul>
 
         <p>Powered by <a href="https://github.com/SemanticWebLanguageServer/swls">SWLS</a> —
         the Semantic Web Language Server.</p>
+
+        <p>If you find this plugin useful, consider <a href="https://ko-fi.com/ajuvercr">supporting the author on Ko-fi</a>.</p>
     ]]></description>
 
     <!-- Product and plugin compatibility requirements.
@@ -53,6 +56,10 @@
                   implementationClass="be.ajuvercr.swls.SparqlFileType"
                   fieldName="INSTANCE"
                   extensions="sq;rq"/>
+        <fileType name="TriG"
+                  implementationClass="be.ajuvercr.swls.TrigFileType"
+                  fieldName="INSTANCE"
+                  extensions="trig"/>
         <notificationGroup id="swls"
                            displayType="BALLOON"/>
     </extensions>
@@ -62,7 +69,7 @@
                 name="Semantic Web Language Server"
                 factoryClass="be.ajuvercr.swls.SwlsFactory">
             <description><![CDATA[
-                Provides IDE integration for Turtle, JSON-LD, and SPARQL through a Language Server.<br/>
+                Provides IDE integration for Turtle, TriG, JSON-LD, and SPARQL through a Language Server.<br/>
                 Enables semantic token highlighting, validation, and code navigation support.
             ]]></description>
         </server>
@@ -75,6 +82,9 @@
         <fileNamePatternMapping patterns="*.sq;*.rq"
                                 serverId="swls"
                                 languageId="SPARQL"/>
+        <fileNamePatternMapping patterns="*.trig"
+                                serverId="swls"
+                                languageId="trig"/>
     </extensions>
 </idea-plugin>
 

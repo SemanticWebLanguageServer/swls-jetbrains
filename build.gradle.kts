@@ -5,7 +5,7 @@ plugins {
 }
 
 group = "be.ajuvercr"
-version = "1.3"
+version = "1.4"
 
 repositories {
     mavenCentral()
@@ -32,7 +32,7 @@ intellijPlatform {
         }
 
         changeNotes = """
-      Initial version
+      1.4: Added TriG (.trig) support
     """.trimIndent()
     }
 }

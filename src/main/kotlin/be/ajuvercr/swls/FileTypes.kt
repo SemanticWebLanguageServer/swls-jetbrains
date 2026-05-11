@@ -12,6 +12,7 @@ class TurtleFileType : LanguageFileType(PlainTextLanguage.INSTANCE) {
     override fun getDescription(): String = "Turtle RDF file"
     override fun getDefaultExtension(): String = "ttl"
     override fun getIcon(): Icon = RDF_ICON
+    override fun getDisplayName(): String = "Turtle"
 
     companion object {
         @JvmStatic
@@ -24,6 +25,7 @@ class JsonLdFileType : LanguageFileType(PlainTextLanguage.INSTANCE) {
     override fun getDescription(): String = "JSON-LD file"
     override fun getDefaultExtension(): String = "jsonld"
     override fun getIcon(): Icon = RDF_ICON
+    override fun getDisplayName(): String = "JSON-LD"
 
     companion object {
         @JvmStatic
@@ -36,9 +38,23 @@ class SparqlFileType : LanguageFileType(PlainTextLanguage.INSTANCE) {
     override fun getDescription(): String = "SPARQL query file"
     override fun getDefaultExtension(): String = "sq"
     override fun getIcon(): Icon = RDF_ICON
+    override fun getDisplayName(): String = "SPARQL"
 
     companion object {
         @JvmStatic
         val INSTANCE = SparqlFileType()
+    }
+}
+
+class TrigFileType : LanguageFileType(PlainTextLanguage.INSTANCE) {
+    override fun getName(): String = "TriG"
+    override fun getDescription(): String = "TriG RDF file"
+    override fun getDefaultExtension(): String = "trig"
+    override fun getIcon(): Icon = RDF_ICON
+    override fun getDisplayName(): String = "TriG"
+
+    companion object {
+        @JvmStatic
+        val INSTANCE = TrigFileType()
     }
 }
