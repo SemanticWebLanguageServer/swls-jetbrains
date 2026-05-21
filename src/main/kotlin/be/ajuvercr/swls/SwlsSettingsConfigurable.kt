@@ -9,7 +9,7 @@ import com.intellij.ui.dsl.builder.bindSelected
 import com.intellij.ui.dsl.builder.bindText
 import com.intellij.ui.dsl.builder.panel
 import com.intellij.ui.dsl.builder.toMutableProperty
-import com.redhat.devtools.lsp4ij.LanguageServiceAccessor
+import com.redhat.devtools.lsp4ij.LanguageServerManager
 import javax.swing.JComponent
 
 class SwlsSettingsConfigurable : Configurable {
@@ -65,11 +65,11 @@ class SwlsSettingsConfigurable : Configurable {
                 }
                 row {
                     button("Restart Server") {
+                        apply()
                         for (project in ProjectManager.getInstance().openProjects) {
-                            LanguageServiceAccessor.getInstance(project)
-                                .startedServers
-                                .filter { it.serverDefinition.id == "swls" }
-                                .forEach { it.restart() }
+                            val manager = LanguageServerManager.getInstance(project)
+                            manager.stop("swls")
+                            manager.start("swls", LanguageServerManager.StartOptions().setForceStart(true))
                         }
                     }
                 }.rowComment("Picks up a newly downloaded binary or changed settings without restarting the IDE")

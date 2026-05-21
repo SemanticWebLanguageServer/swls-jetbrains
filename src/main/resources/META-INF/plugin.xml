@@ -91,7 +91,10 @@
         <fileNamePatternMapping patterns="*.jsonld"
                                 serverId="swls"
                                 languageId="JSON-LD"/>
-        <fileNamePatternMapping patterns="*.sq;*.rq"
+        <fileNamePatternMapping patterns="*.rq"
+                                serverId="swls"
+                                languageId="SPARQL"/>
+        <fileNamePatternMapping patterns="*.sq"
                                 serverId="swls"
                                 languageId="SPARQL"/>
         <fileNamePatternMapping patterns="*.trig"

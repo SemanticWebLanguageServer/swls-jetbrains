@@ -23,7 +23,7 @@ import com.intellij.openapi.progress.ProgressIndicator
 import com.intellij.openapi.progress.ProgressManager
 import com.intellij.openapi.progress.Task
 import com.intellij.openapi.vfs.VirtualFile
-import com.redhat.devtools.lsp4ij.LanguageServiceAccessor
+import com.redhat.devtools.lsp4ij.LanguageServerManager
 
 
 private val LOG = Logger.getInstance(SwlsServer::class.java)
@@ -230,10 +230,9 @@ class SwlsServer(project: Project) : ProcessStreamConnectionProvider() {
                                 NotificationType.INFORMATION
                             )
                             .addAction(NotificationAction.createSimple("Restart Server") {
-                                LanguageServiceAccessor.getInstance(project)
-                                    .startedServers
-                                    .filter { it.serverDefinition.id == "swls" }
-                                    .forEach { it.restart() }
+                                val manager = LanguageServerManager.getInstance(project)
+                                manager.stop("swls")
+                                manager.start("swls", LanguageServerManager.StartOptions().setForceStart(true))
                             })
                             .notify(project)
                     } else {
@@ -250,10 +249,9 @@ class SwlsServer(project: Project) : ProcessStreamConnectionProvider() {
                                         object : Task.Backgroundable(project, "Downloading swls $latestVersion...") {
                                             override fun run(indicator: ProgressIndicator) {
                                                 downloadVersion(binPath, latestVersion)
-                                                LanguageServiceAccessor.getInstance(project)
-                                                    .startedServers
-                                                    .filter { it.serverDefinition.id == "swls" }
-                                                    .forEach { it.restart() }
+                                                val manager = LanguageServerManager.getInstance(project)
+                                                manager.stop("swls")
+                                                manager.start("swls", LanguageServerManager.StartOptions().setForceStart(true))
                                             }
                                         }
                                     )

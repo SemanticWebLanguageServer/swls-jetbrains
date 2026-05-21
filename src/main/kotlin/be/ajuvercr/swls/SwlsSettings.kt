@@ -17,7 +17,7 @@ class SwlsSettings : PersistentStateComponent<SwlsSettings.State> {
         var turtle: Boolean = true,
         var trig: Boolean = true,
         var jsonld: Boolean = true,
-        var sparql: Boolean = false,
+        var sparql: Boolean = true,
         // newline-separated URLs
         var ontologies: String = "",
         var shapes: String = "",
