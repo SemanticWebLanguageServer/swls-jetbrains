@@ -44,21 +44,33 @@
 
 
     <extensions defaultExtensionNs="com.intellij">
+        <applicationService serviceImplementation="be.ajuvercr.swls.SwlsSettings"/>
+        <applicationConfigurable
+                parentId="language"
+                instance="be.ajuvercr.swls.SwlsSettingsConfigurable"
+                id="be.ajuvercr.swls.settings"
+                displayName="Semantic Web Language Server"
+                icon="/icons/logo.png"/>
+
         <fileType name="Turtle"
                   implementationClass="be.ajuvercr.swls.TurtleFileType"
                   fieldName="INSTANCE"
+                  language="TEXT"
                   extensions="ttl"/>
         <fileType name="JSON-LD"
                   implementationClass="be.ajuvercr.swls.JsonLdFileType"
                   fieldName="INSTANCE"
+                  language="TEXT"
                   extensions="jsonld"/>
         <fileType name="SPARQL"
                   implementationClass="be.ajuvercr.swls.SparqlFileType"
                   fieldName="INSTANCE"
+                  language="TEXT"
                   extensions="sq;rq"/>
         <fileType name="TriG"
                   implementationClass="be.ajuvercr.swls.TrigFileType"
                   fieldName="INSTANCE"
+                  language="TEXT"
                   extensions="trig"/>
         <notificationGroup id="swls"
                            displayType="BALLOON"/>

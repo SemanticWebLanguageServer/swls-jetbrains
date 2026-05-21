@@ -5,7 +5,7 @@ plugins {
 }
 
 group = "be.ajuvercr"
-version = "1.4"
+version = "1.5"
 
 repositories {
     mavenCentral()
@@ -32,6 +32,7 @@ intellijPlatform {
         }
 
         changeNotes = """
+      1.5: Added plugin configuration (log level, language toggles, ontologies, shapes, completion mode), automatic binary updates, and Restart Server action
       1.4: Added TriG (.trig) support
     """.trimIndent()
     }

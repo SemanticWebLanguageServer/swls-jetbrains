@@ -16,7 +16,14 @@ import com.intellij.openapi.application.PathManager
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.notification.NotificationGroupManager
 import com.intellij.notification.NotificationType
+import com.intellij.notification.Notification
+import com.intellij.notification.NotificationAction
+import com.intellij.openapi.actionSystem.AnActionEvent
+import com.intellij.openapi.progress.ProgressIndicator
 import com.intellij.openapi.progress.ProgressManager
+import com.intellij.openapi.progress.Task
+import com.intellij.openapi.vfs.VirtualFile
+import com.redhat.devtools.lsp4ij.LanguageServiceAccessor
 
 
 private val LOG = Logger.getInstance(SwlsServer::class.java)
@@ -32,35 +39,75 @@ class SwlsFactory : LanguageServerFactory {
 
 class SwlsServer(project: Project) : ProcessStreamConnectionProvider() {
     init {
-        val binPath = getBinPath()
+        val settings = SwlsSettings.getInstance().state
 
-        if (Files.exists(binPath)) {
-            // Binary exists — launch immediately, check for updates in the background
-            LOG.info("Using existing binary at: $binPath")
-            super.setCommands(listOf(binPath.toAbsolutePath().toString()))
-            checkForUpdatesAsync(binPath, project)
-        } else {
-            // No binary yet — must download before we can start
-            var downloaded: Path? = null
-            ProgressManager.getInstance().runProcessWithProgressSynchronously(
-                {
-                    try {
-                        downloaded = downloadLatest(binPath)
-                    } catch (e: Exception) {
-                        LOG.error("Failed to download LSP binary", e)
-                    }
-                },
-                "Downloading Semantic Web Language Server...",
-                false,
-                null
-            )
-
-            if (downloaded == null) {
-                throw RuntimeException("Could not download Semantic Web Language Server binary.")
+        val swlsSettings = SwlsSettings.getInstance()
+        if (settings.command.isNotBlank()) {
+            val path = Paths.get(settings.command)
+            if (!Files.exists(path)) {
+                throw RuntimeException("Specified SWLS binary not found: ${settings.command}")
             }
+            swlsSettings.resolvedBinary = settings.command
+            super.setCommands(listOf(settings.command))
+        } else {
+            val binPath = getBinPath()
 
-            super.setCommands(listOf(downloaded!!.toAbsolutePath().toString()))
+            if (Files.exists(binPath)) {
+                LOG.info("Using existing binary at: $binPath")
+                swlsSettings.resolvedBinary = binPath.toAbsolutePath().toString()
+                super.setCommands(listOf(binPath.toAbsolutePath().toString()))
+                if (settings.checkUpdate) checkForUpdatesAsync(binPath, project, settings.automaticUpdate)
+            } else {
+                var downloaded: Path? = null
+                ProgressManager.getInstance().runProcessWithProgressSynchronously(
+                    {
+                        try {
+                            downloaded = downloadLatest(binPath)
+                        } catch (e: Exception) {
+                            LOG.error("Failed to download LSP binary", e)
+                        }
+                    },
+                    "Downloading Semantic Web Language Server...",
+                    false,
+                    null
+                )
+
+                if (downloaded == null) {
+                    throw RuntimeException("Could not download Semantic Web Language Server binary.")
+                }
+
+                swlsSettings.resolvedBinary = downloaded!!.toAbsolutePath().toString()
+                super.setCommands(listOf(downloaded!!.toAbsolutePath().toString()))
+            }
         }
+    }
+
+    override fun getInitializationOptions(rootUri: VirtualFile?): Any {
+        val s = SwlsSettings.getInstance().state
+
+        fun parseLines(raw: String): List<String> =
+            raw.lines().map { it.trim() }.filter { it.isNotEmpty() }
+
+        val completionStrict = parseLines(s.completionStrict)
+        val completionExcept = parseLines(s.completionExcept)
+        val completion: Any = when {
+            completionStrict.isNotEmpty() -> mapOf("strict" to completionStrict)
+            completionExcept.isNotEmpty() -> mapOf("loose" to completionExcept)
+            else -> s.completionMode
+        }
+
+        return mapOf(
+            "log" to s.log,
+            "turtle" to s.turtle,
+            "trig" to s.trig,
+            "jsonld" to s.jsonld,
+            "sparql" to s.sparql,
+            "ontologies" to parseLines(s.ontologies),
+            "shapes" to parseLines(s.shapes),
+            "disabled" to parseLines(s.disabled),
+            "prefix_disabled" to parseLines(s.prefixDisabled),
+            "completion" to completion,
+        )
     }
 
     companion object {
@@ -138,22 +185,30 @@ class SwlsServer(project: Project) : ProcessStreamConnectionProvider() {
             val url = "https://github.com/$REPO/releases/download/$version/$PLAIN-$target"
             LOG.info("Downloading from $url to $binPath")
 
-            URL(url).openStream().use { input ->
-                FileOutputStream(binPath.toFile()).use { output ->
-                    input.copyTo(output)
+            val tmpPath = binPath.resolveSibling(binPath.fileName.toString() + ".tmp")
+            try {
+                URL(url).openStream().use { input ->
+                    FileOutputStream(tmpPath.toFile()).use { output ->
+                        input.copyTo(output)
+                    }
                 }
-            }
 
-            val osName = System.getProperty("os.name").lowercase()
-            if (!osName.contains("win")) {
-                binPath.toFile().setExecutable(true, false)
+                val osName = System.getProperty("os.name").lowercase()
+                if (!osName.contains("win")) {
+                    tmpPath.toFile().setExecutable(true, false)
+                }
+
+                Files.move(tmpPath, binPath, java.nio.file.StandardCopyOption.REPLACE_EXISTING)
+            } catch (e: Exception) {
+                Files.deleteIfExists(tmpPath)
+                throw e
             }
 
             LOG.info("Downloaded $version")
             return binPath
         }
 
-        private fun checkForUpdatesAsync(binPath: Path, project: Project) {
+        private fun checkForUpdatesAsync(binPath: Path, project: Project, automaticUpdate: Boolean) {
             Thread {
                 try {
                     val currentVersion = getCurrentVersion(binPath)
@@ -165,15 +220,47 @@ class SwlsServer(project: Project) : ProcessStreamConnectionProvider() {
                     }
 
                     LOG.info("Update available: $currentVersion → $latestVersion")
-                    downloadVersion(binPath, latestVersion)
 
-                    NotificationGroupManager.getInstance()
-                        .getNotificationGroup("swls")
-                        .createNotification(
-                            "swls updated to $latestVersion. Restart IDE to apply.",
-                            NotificationType.INFORMATION
-                        )
-                        .notify(project)
+                    if (automaticUpdate) {
+                        downloadVersion(binPath, latestVersion)
+                        NotificationGroupManager.getInstance()
+                            .getNotificationGroup("swls")
+                            .createNotification(
+                                "swls updated to $latestVersion.",
+                                NotificationType.INFORMATION
+                            )
+                            .addAction(NotificationAction.createSimple("Restart Server") {
+                                LanguageServiceAccessor.getInstance(project)
+                                    .startedServers
+                                    .filter { it.serverDefinition.id == "swls" }
+                                    .forEach { it.restart() }
+                            })
+                            .notify(project)
+                    } else {
+                        NotificationGroupManager.getInstance()
+                            .getNotificationGroup("swls")
+                            .createNotification(
+                                "swls $latestVersion is available.",
+                                NotificationType.INFORMATION
+                            )
+                            .addAction(object : NotificationAction("Download & Restart") {
+                                override fun actionPerformed(e: AnActionEvent, notification: Notification) {
+                                    notification.expire()
+                                    ProgressManager.getInstance().run(
+                                        object : Task.Backgroundable(project, "Downloading swls $latestVersion...") {
+                                            override fun run(indicator: ProgressIndicator) {
+                                                downloadVersion(binPath, latestVersion)
+                                                LanguageServiceAccessor.getInstance(project)
+                                                    .startedServers
+                                                    .filter { it.serverDefinition.id == "swls" }
+                                                    .forEach { it.restart() }
+                                            }
+                                        }
+                                    )
+                                }
+                            })
+                            .notify(project)
+                    }
                 } catch (e: Exception) {
                     LOG.warn("Background update check failed: $e")
                 }
