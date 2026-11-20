@@ -19,6 +19,7 @@ class SwlsSettingsConfigurable : Configurable {
     private var command = ""
     private var checkUpdate = true
     private var automaticUpdate = false
+    private var channel = "stable"
     private var log = "debug"
     private var turtle = true
     private var trig = true
@@ -63,6 +64,10 @@ class SwlsSettingsConfigurable : Configurable {
                 row {
                     checkBox("Automatically install updates").bindSelected(::automaticUpdate)
                 }
+                row("Release channel:") {
+                    comboBox(listOf("stable", "nightly"))
+                        .bindItem({ channel }) { channel = it ?: "stable" }
+                }.rowComment("'nightly' follows a rolling build of main, rebuilt on every push. Restart the server to check for it.")
                 row {
                     button("Restart Server") {
                         apply()
@@ -121,6 +126,7 @@ class SwlsSettingsConfigurable : Configurable {
         state.command = command
         state.checkUpdate = checkUpdate
         state.automaticUpdate = automaticUpdate
+        state.channel = channel
         state.log = log
         state.turtle = turtle
         state.trig = trig
@@ -145,6 +151,7 @@ class SwlsSettingsConfigurable : Configurable {
         command = state.command
         checkUpdate = state.checkUpdate
         automaticUpdate = state.automaticUpdate
+        channel = state.channel
         log = state.log
         turtle = state.turtle
         trig = state.trig

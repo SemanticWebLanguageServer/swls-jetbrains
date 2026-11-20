@@ -31,6 +31,10 @@ private val LOG = Logger.getInstance(SwlsServer::class.java)
 private const val REPO = "SemanticWebLanguageServer/swls"
 private const val PLAIN = "swls"
 private val VERSION_REGEX = Regex("""version=(\S+)""")
+private val STABLE_TAG = Regex("""swls-v\d.*""")
+
+/** A GitHub release: [tag] to download assets from, [version] its binary reports. */
+private data class Release(val tag: String, val version: String)
 
 class SwlsFactory : LanguageServerFactory {
     override fun createConnectionProvider(project: Project): StreamConnectionProvider = SwlsServer(project)
@@ -56,13 +60,13 @@ class SwlsServer(project: Project) : ProcessStreamConnectionProvider() {
                 LOG.info("Using existing binary at: $binPath")
                 swlsSettings.resolvedBinary = binPath.toAbsolutePath().toString()
                 super.setCommands(listOf(binPath.toAbsolutePath().toString()))
-                if (settings.checkUpdate) checkForUpdatesAsync(binPath, project, settings.automaticUpdate)
+                if (settings.checkUpdate) checkForUpdatesAsync(binPath, project, settings.automaticUpdate, settings.channel)
             } else {
                 var downloaded: Path? = null
                 ProgressManager.getInstance().runProcessWithProgressSynchronously(
                     {
                         try {
-                            downloaded = downloadLatest(binPath)
+                            downloaded = downloadLatest(binPath, settings.channel)
                         } catch (e: Exception) {
                             LOG.error("Failed to download LSP binary", e)
                         }
@@ -137,8 +141,8 @@ class SwlsServer(project: Project) : ProcessStreamConnectionProvider() {
             return if (osName.contains("win")) "swls.exe" else "swls"
         }
 
-        private fun getLatestRelease(): String {
-            val conn = (URL("https://api.github.com/repos/$REPO/releases").openConnection() as HttpURLConnection).apply {
+        private fun githubApi(path: String): com.google.gson.JsonElement {
+            val conn = (URL("https://api.github.com/repos/$REPO$path").openConnection() as HttpURLConnection).apply {
                 requestMethod = "GET"
                 setRequestProperty("Accept", "application/vnd.github.v3+json")
                 connectTimeout = 10_000
@@ -146,18 +150,40 @@ class SwlsServer(project: Project) : ProcessStreamConnectionProvider() {
             }
 
             if (conn.responseCode != 200) {
-                throw RuntimeException("Failed to fetch releases: HTTP ${conn.responseCode}")
+                throw RuntimeException("GitHub API $path: HTTP ${conn.responseCode}")
             }
 
             val payload = conn.inputStream.bufferedReader().readText()
-            val releases = JsonParser.parseString(payload).asJsonArray
-            val latest = releases.firstOrNull {
-                val tag = it.asJsonObject.get("tag_name")?.asString
-                tag != null && tag.startsWith("swls-")
-            } ?: throw RuntimeException("No valid release found")
-
-            return latest.asJsonObject.get("tag_name").asString
+            return JsonParser.parseString(payload)
         }
+
+        private fun getLatestRelease(channel: String): Release {
+            if (channel == "nightly") {
+                // A single rolling release, rebuilt on every push to main. Its name is
+                // `nightly-<short sha>`, which is also what the binary reports.
+                val release = githubApi("/releases/tags/nightly").asJsonObject
+                val name = release.get("name")?.takeIf { it.isJsonPrimitive }?.asString
+                    ?: throw RuntimeException("Nightly release has no name")
+                return Release(tag = "nightly", version = name)
+            }
+
+            // Only main binary releases (swls-vX.Y.Z), not sub-crate tags
+            // (swls-lang-*, swls-core-*), and no pre-releases.
+            val latest = githubApi("/releases").asJsonArray
+                .map { it.asJsonObject }
+                .firstOrNull {
+                    val tag = it.get("tag_name")?.takeIf { t -> t.isJsonPrimitive }?.asString
+                    tag != null && STABLE_TAG.matches(tag) &&
+                        it.get("prerelease")?.asBoolean != true &&
+                        it.get("draft")?.asBoolean != true
+                } ?: throw RuntimeException("No stable release found")
+
+            val tag = latest.get("tag_name").asString
+            return Release(tag = tag, version = normalizeVersion(tag))
+        }
+
+        /** `swls --version` may report "0.3.0" while stable tags are "swls-v0.3.0". */
+        private fun normalizeVersion(version: String): String = version.removePrefix("swls-v")
 
         private fun getCurrentVersion(binaryPath: Path): String {
             return try {
@@ -174,9 +200,8 @@ class SwlsServer(project: Project) : ProcessStreamConnectionProvider() {
             }
         }
 
-        private fun downloadLatest(binPath: Path): Path {
-            val latestVersion = getLatestRelease()
-            return downloadVersion(binPath, latestVersion)
+        private fun downloadLatest(binPath: Path, channel: String): Path {
+            return downloadVersion(binPath, getLatestRelease(channel).tag)
         }
 
         private fun downloadVersion(binPath: Path, version: String): Path {
@@ -208,21 +233,22 @@ class SwlsServer(project: Project) : ProcessStreamConnectionProvider() {
             return binPath
         }
 
-        private fun checkForUpdatesAsync(binPath: Path, project: Project, automaticUpdate: Boolean) {
+        private fun checkForUpdatesAsync(binPath: Path, project: Project, automaticUpdate: Boolean, channel: String) {
             Thread {
                 try {
-                    val currentVersion = getCurrentVersion(binPath)
-                    val latestVersion = getLatestRelease()
+                    val currentVersion = normalizeVersion(getCurrentVersion(binPath))
+                    val latest = getLatestRelease(channel)
+                    val latestVersion = latest.version
 
                     if (currentVersion == latestVersion) {
-                        LOG.info("Already at latest version: $currentVersion")
+                        LOG.info("Already at latest $channel version: $currentVersion")
                         return@Thread
                     }
 
                     LOG.info("Update available: $currentVersion → $latestVersion")
 
                     if (automaticUpdate) {
-                        downloadVersion(binPath, latestVersion)
+                        downloadVersion(binPath, latest.tag)
                         NotificationGroupManager.getInstance()
                             .getNotificationGroup("swls")
                             .createNotification(
@@ -248,7 +274,7 @@ class SwlsServer(project: Project) : ProcessStreamConnectionProvider() {
                                     ProgressManager.getInstance().run(
                                         object : Task.Backgroundable(project, "Downloading swls $latestVersion...") {
                                             override fun run(indicator: ProgressIndicator) {
-                                                downloadVersion(binPath, latestVersion)
+                                                downloadVersion(binPath, latest.tag)
                                                 val manager = LanguageServerManager.getInstance(project)
                                                 manager.stop("swls")
                                                 manager.start("swls", LanguageServerManager.StartOptions().setForceStart(true))

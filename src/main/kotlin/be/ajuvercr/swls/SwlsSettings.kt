@@ -13,6 +13,8 @@ class SwlsSettings : PersistentStateComponent<SwlsSettings.State> {
         var command: String = "",
         var checkUpdate: Boolean = true,
         var automaticUpdate: Boolean = false,
+        // "stable" (swls-vX.Y.Z releases) or "nightly" (rolling build of main)
+        var channel: String = "stable",
         var log: String = "debug",
         var turtle: Boolean = true,
         var trig: Boolean = true,

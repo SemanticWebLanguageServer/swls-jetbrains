@@ -30,7 +30,7 @@ JetBrains IDE plugin for the [Semantic Web Language Server (SWLS)](https://githu
 
 Install from the [JetBrains Marketplace](https://plugins.jetbrains.com/) — search for **"SWLS"** or **"Semantic Web Language Server"**.
 
-The plugin automatically downloads and manages the SWLS binary. Updates are checked in the background.
+The plugin automatically downloads and manages the SWLS binary. Updates are checked in the background. Set **Release channel** to `nightly` in *Settings → Languages & Frameworks → Semantic Web Language Server* to follow a rolling build of `main` instead of tagged releases.
 
 ## Building from Source
 
